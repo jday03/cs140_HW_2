@@ -31,30 +31,40 @@ void generatevec(double * x,int size)
 double powerMethod(double * mat, double * x, int size, int iter)
 {
   int n = sqrt (size);
-  MPI_Bcast(&x, size, MPI_INT, 0, MPI_COMM_WORLD);
-double * newVec;
-// CALL newVec = multiply_Matrix();
+  broadcastVector(x, size);
 
-// USE GATHER TO GET ALL THE NEW VECTOR VALUES
+ for (int iterCount = 0; iterCount < iter; ++iterCount) {
+   double *calculatedValues;
 
+  calculatedValues = multiply_Matrix(mat, x, n);
+  gatherNewVec(calculatedValues, n, x);
+  broadcastVector(x, size);
 
-  MPI_Gather(newVec, 1, MPI_INT, x, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  // gotta figure out the arguments
+  double sum;
+  sum = norm2();
 
-  // NEW UPDATE OF VECTOR SO WE CAN SQUARE THE SHIT.
-  MPI_Bcast(&x, size, MPI_INT, 0, MPI_COMM_WORLD);
+  updateVecValue(x,sum,n);
+  broadcastVector(x, size);
 
-double* square;
-  square = squareVector();
+ }
 
-
-// USE REDUCE TO GET THE SQUARES BACK IN SUM FORM
-//if proc is 1
-  // go ahead and get that new vec/ magnitude
-
-// Next is to get the
+  // idk what value this is
   return lambda;
 }
+
+
+
+double* updateVecValue(double *x, double norm, int n){
+  for (int count = 0; count < n; ++count){
+    *(x + count) = (*(x + count)) / norm;
+  }
+
+}
+
+
+
+
+
 
 double* multiply_Matrix(double * mat, double * x, int n){
 
@@ -94,8 +104,30 @@ double squareVector(double * x, int n){
 
 void broadcastVector(double * vector,int size){
 
+  // Can include better implementation later.
+  MPI_Bcast(&vector, size, MPI_INT, 0, MPI_COMM_WORLD);
 
 
 
 }
 
+void gatherNewVec(double * vecValues, int n, double * vec){
+  // Can optimize later
+  double * totalVec;
+  MPI_Gather(&vecValues, n/PROC, MPI_INT, vec, PROCS, MPI_INT, 0, comm);
+
+}
+
+
+
+void receiveSquares(double * square, double *sum){
+  MPI_Reduce(&square, &sum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  if (PROC == 1){
+    return sum;
+  }
+  return 0.0;
+}
+
+norm2(){
+
+}
