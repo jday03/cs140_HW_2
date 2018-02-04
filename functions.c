@@ -4,9 +4,9 @@
  * */
 
 /* This file provides the placeholder function definitions, where you will be
- * implementing the assignment algorithms. You will be required to turn in 
+ * implementing the assignment algorithms. You will be required to turn in
  * only this file during the submission, where it will be compiled together
- * with our main function and tested. It is therefore required that you keep the 
+ * with our main function and tested. It is therefore required that you keep the
  * function declaration formats unchanged.
  */
 
@@ -22,14 +22,16 @@ void generatematrix(double * mat, int size)
   //To Do: make 1111
   //            2222
   //            3333
+
   int i;
+    int n = sqrt(size);
   for (i = 0; i < size; i++ ){
-    *(mat + i) = floor(i / sqrt(size)) + 1.0; // every member of matrix is equal to row number
+    *(mat + i) = floor(i / n) + 1.0; // every member of matrix is equal to row number
   }
 }
 
 // Subroutine to generate a start vector
-void generatevec(double * x,int size)
+void generateVec(double * x,int size)
 {
   int i;
   for (i = 0; i < size; i++ ){
@@ -47,16 +49,15 @@ double powerMethod(double * mat, double * x, int size, int iter)
  for (iterCount = 0; iterCount < iter; ++iterCount) {
    double *calculatedValues;
 
-  calculatedValues = multiply_Matrix(mat, x, n);
+  calculatedValues = matVec(mat, x, n);
   gatherNewVec(calculatedValues, n, x);
   broadcastVector(x, size);
 
   double sum;
-  sum = norm2(calculatedValues, n );
-  lambda = calculatedValues/sum;
+  sum = norm2(calculatedValues, n);
 
-  // different for every process.
-   updateVecValue(x,sum,n);
+  updateLambdaVec(lambda,x,sum);
+
   broadcastVector(x, size);
 
  }
@@ -65,13 +66,12 @@ double powerMethod(double * mat, double * x, int size, int iter)
 }
 
 
+void updateLambdaVec(double * lambda, double* x,double sum, int n){
 
-void updateVecValue(double *x, double norm, int n){
-  int count;
-  for (count = 0; count < n; ++count){
-    *(x + count) = (*(x + count)) / norm;
-  }
-
+    for(int count = 0; count < n; ++count){
+        *(lambda+count) = *(x+count)/sum;
+        *(x+count) = *(lambda+ count);
+    }
 }
 
 
@@ -79,17 +79,22 @@ void updateVecValue(double *x, double norm, int n){
 
 
 
-double*  multiply_Matrix(double * mat, double * x, int n){
 
+
+
+double*  matVec(double *mat, double *x, int n){
+
+    int nprocs;
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
   double *returnMatrix;
-  returnMatrix = (double *) calloc(n /nprocs, sizeof(double)) //num of processors out of scope????
+  returnMatrix = (double *) calloc(n /nprocs, sizeof(double)); //num of processors out of scope????
   //returnMatrix = new [n/ PROC] double ;
   int rowcount, colCount;
     for(rowCount = 0; rowCount < n; ++rowCount){
-      *returnMatrix[rowCount] = 0;
+      *(returnMatrix + rowCount) = 0;
       for(colCount = 0; colCount < n; ++colCount) {
-        *returnMatrix[rowCount] += *(mat+colCount) * (x+colCount);
+        *(returnMatrix + rowCount) += *(mat+colCount) *  *(x+colCount);
       }
 
     }
@@ -120,19 +125,21 @@ double squareVector(double * x, int n){
 void broadcastVector(double * vector,int size){
 
   // Can include better implementation later.
-  MPI_Bcast(&vector, size, MPI_INT, 0, MPI_COMM_WORLD);
-
+  MPI_Bcast(&vector, &size, MPI_INT, 0, MPI_COMM_WORLD);
 
 
 }
 
-void gatherNewVec(double * vecValues, int n, double * vec){
+void gatherNewVec(double *vecValues, int n, double * vec){
   // Can optimize later
   double * totalVec;
   int myrank,nprocs;
+  int rowSplit = n/nprocs;
+
   MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-  MPI_Gather(&vecValues, n/nprocs, MPI_INT, vec, nprocs, MPI_INT, 0, comm);
+
+  MPI_Gather(&vecValues, &rowSplit, MPI_INT, &vec, &n, MPI_INT, 0, MPI_COMM_WORLD);
 
 }
 
@@ -143,19 +150,28 @@ void receiveSquares(double * square, double *sum){   //maybe need to change retu
   int myrank,nprocs;
   MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-  if (nprocs == 1){
-    return sum;
-  }
-  return 0.0;
+
 }
 
+
 double norm2(double *x, int size){
-  int i;
-  double sum = 0;
-  double tempSquare;
-  for(i = 0; i < size; i++){
-    tempSquare = *(x + i);
-    sum = sum + pow( tempSquare, 2);
-  }
-  return sqrt(sum);
+
+    int myrank,nprocs;
+
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+    int finishPoint = (myrank + 1) * (n/nprocs);
+    double partialSum = 0.0;
+
+    for(int i = myrank * (n/nprocs); i < finishPoint; ++i){
+        double tempSquare = *(x + i);
+        partialSum = partialSum + pow(tempSquare, 2);
+    }
+
+    double sum = 0.0;
+    MPI_Reduce(&partialSum, &sum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+
+    return sum;
 }
