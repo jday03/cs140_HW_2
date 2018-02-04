@@ -15,6 +15,13 @@
 // Subroutine for generating the input matrix (just one thread's part)
 void generatematrix(double * mat, int size)
 {
+  int myrank,nprocs;
+  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  //use these to know what rows are getting
+  //To Do: make 1111
+  //            2222
+  //            3333
   int i;
   for (i = 0; i < size; i++ ){
     *(mat + i) = floor(i / sqrt(size)) + 1.0; // every member of matrix is equal to row number
@@ -34,6 +41,7 @@ void generatevec(double * x,int size)
 double powerMethod(double * mat, double * x, int size, int iter)
 {
   int n = sqrt (size);
+  double lambda;
   broadcastVector(x, size);
   int iterCount;
  for (iterCount = 0; iterCount < iter; ++iterCount) {
@@ -45,7 +53,7 @@ double powerMethod(double * mat, double * x, int size, int iter)
 
   double sum;
   sum = norm2(calculatedValues, n );
-  lambda = calculatedValues/norm;
+  lambda = calculatedValues/sum;
 
   // different for every process.
    updateVecValue(x,sum,n);
@@ -53,13 +61,12 @@ double powerMethod(double * mat, double * x, int size, int iter)
 
  }
 
-  // idk what value this is
   return lambda;
 }
 
 
 
-double* updateVecValue(double *x, double norm, int n){
+void updateVecValue(double *x, double norm, int n){
   int count;
   for (count = 0; count < n; ++count){
     *(x + count) = (*(x + count)) / norm;
@@ -72,14 +79,16 @@ double* updateVecValue(double *x, double norm, int n){
 
 
 
-double  *multiply_Matrix(double * mat, double * x, int n){
+double*  multiply_Matrix(double * mat, double * x, int n){
 
 
   double *returnMatrix;
-  returnMatrix = new [n/ PROC] double ;
-    for(int rowCount = 0; rowCount < n; ++rowCount){
+  returnMatrix = (double *) calloc(n /nprocs, sizeof(double)) //num of processors out of scope????
+  //returnMatrix = new [n/ PROC] double ;
+  int rowcount, colCount;
+    for(rowCount = 0; rowCount < n; ++rowCount){
       *returnMatrix[rowCount] = 0;
-      for(int colCount = 0; colCount < n; ++colCount) {
+      for(colCount = 0; colCount < n; ++colCount) {
         *returnMatrix[rowCount] += *(mat+colCount) * (x+colCount);
       }
 
@@ -120,21 +129,27 @@ void broadcastVector(double * vector,int size){
 void gatherNewVec(double * vecValues, int n, double * vec){
   // Can optimize later
   double * totalVec;
-  MPI_Gather(&vecValues, n/PROC, MPI_INT, vec, PROCS, MPI_INT, 0, comm);
+  int myrank,nprocs;
+  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  MPI_Gather(&vecValues, n/nprocs, MPI_INT, vec, nprocs, MPI_INT, 0, comm);
 
 }
 
 
 
-void receiveSquares(double * square, double *sum){
+void receiveSquares(double * square, double *sum){   //maybe need to change return type
   MPI_Reduce(&square, &sum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-  if (PROC == 1){
+  int myrank,nprocs;
+  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  if (nprocs == 1){
     return sum;
   }
   return 0.0;
 }
 
-norm2(double *x, int size){
+double norm2(double *x, int size){
   int i;
   double sum = 0;
   double tempSquare;
