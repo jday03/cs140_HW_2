@@ -1,6 +1,6 @@
 /* CS 140
  * Assignment 2 : Matrix Vector Multiplication and the Power Method 
- * Group members : <Team-member-1> , <Team-member-2>
+ * Group members : Jonathon Day , Noel Vargas
  * */
 
 /* This file provides the placeholder function definitions, where you will be
@@ -17,14 +17,17 @@ void generatematrix(double * mat, int size)
 {
   int i;
   for (i = 0; i < size; i++ ){
-    *(mat + i) = -500 + rand() / RAND_MAX / 1000; //random num between -500 and 500
+    *(mat + i) = floor(i / sqrt(size)) + 1.0; // every member of matrix is equal to row number
   }
 }
 
 // Subroutine to generate a start vector
 void generatevec(double * x,int size)
 {
-  generatematrix(x, size);
+  int i;
+  for (i = 0; i < size; i++ ){
+    *(x + i) = 1; // vector of 1s
+  }
 }
 
 // Subroutine for the power method, to return the spectral radius
@@ -32,8 +35,8 @@ double powerMethod(double * mat, double * x, int size, int iter)
 {
   int n = sqrt (size);
   broadcastVector(x, size);
-
- for (int iterCount = 0; iterCount < iter; ++iterCount) {
+  int iterCount;
+ for (iterCount = 0; iterCount < iter; ++iterCount) {
    double *calculatedValues;
 
   calculatedValues = multiply_Matrix(mat, x, n);
@@ -41,9 +44,11 @@ double powerMethod(double * mat, double * x, int size, int iter)
   broadcastVector(x, size);
 
   double sum;
-  sum = norm2();
+  sum = norm2(calculatedValues, n );
+  lambda = calculatedValues/norm;
 
-  updateVecValue(x,sum,n);
+  // different for every process.
+   updateVecValue(x,sum,n);
   broadcastVector(x, size);
 
  }
@@ -55,7 +60,8 @@ double powerMethod(double * mat, double * x, int size, int iter)
 
 
 double* updateVecValue(double *x, double norm, int n){
-  for (int count = 0; count < n; ++count){
+  int count;
+  for (count = 0; count < n; ++count){
     *(x + count) = (*(x + count)) / norm;
   }
 
@@ -66,7 +72,7 @@ double* updateVecValue(double *x, double norm, int n){
 
 
 
-double* multiply_Matrix(double * mat, double * x, int n){
+double  *multiply_Matrix(double * mat, double * x, int n){
 
 
   double *returnMatrix;
@@ -128,6 +134,13 @@ void receiveSquares(double * square, double *sum){
   return 0.0;
 }
 
-norm2(){
-
+norm2(double *x, int size){
+  int i;
+  double sum = 0;
+  double tempSquare;
+  for(i = 0; i < size; i++){
+    tempSquare = *(x + i);
+    sum = sum + pow( tempSquare, 2);
+  }
+  return sqrt(sum);
 }
