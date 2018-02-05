@@ -14,21 +14,45 @@
 // Subroutine for generating the input matrix (just one thread's part)
 void generatematrix(double * mat, int size)
 {
-  int myrank,nprocs;
+    int myrank,nprocs;
+    int amountOfColumns;
+    double *tempMat;
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    int i, j;
+    int x;
+    amountOfColumns = size / nprocs;
 
-    //use these to know what rows are getting
-  //To Do: make 1111
-  //            2222
-  //            3333
-  int i;
-    int fullSize = size * size/ nprocs;
-  for (i = 0; i < fullSize; i++ ){
-    *(mat + i) = floor(i / size) + 1.0; // every member of matrix is equal to row number
-      printf("MAT %f\n", *(mat + i));
+    tempMat = (double *) calloc(size * size, sizeof(double));
+    for(i = 0; i < size; i++) {
+        for (j = 0; j < size; j++) {
+            if (j < i + 1) {
+                x = i * size + j;
+                tempMat[x] = i + 1;
+            } else {
+                x = i * size + j;
+                tempMat[x] = 0;
+            }
 
-  }
+        }
+    }
+
+    for(i=0; i< size*size; i++){
+       // printf("tempMat[%d] = %f\n" , i, tempMat[i]);
+    }
+    for(i=0; i < size * amountOfColumns; i++){
+        mat[i] = tempMat[i + myrank*amountOfColumns * size] ;
+    }
+
+  //  printf("myrank = %d\n", myrank);
+    for(i = 0; i < size *amountOfColumns; i++){
+        printf("mat[%d] : %f\n", i, mat[i]);
+
+    }
+
+    free(tempMat);
 }
+
 
 // Subroutine to generate a start vector
 void generatevec(double * x,int size)
@@ -41,7 +65,7 @@ void generatevec(double * x,int size)
         double *iter;
         for (iter = x; i < size; iter++) {
             x[i] = 1.0;
-            printf("VEC %f\n", x[i]);
+           // printf("VEC %f\n", x[i]);
             i++;
         }
     }
@@ -50,39 +74,46 @@ void generatevec(double * x,int size)
 // Subroutine for the power method, to return the spectral radius
 double powerMethod(double * mat, double * x, int size, int iter)
 {
-
-    double *lambda;
-
     int myrank,nprocs;
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
+    double *lambda;
+    double *calculatedValues= (double *) calloc(size/nprocs, sizeof(double));
 
-    int n = size;
+
+
+
   broadcastVector(x, size);
     int counter;
-    for(counter = 0; counter < size; ++counter){
-        printf("rank is %d, value of %u is %f \n",myrank,counter,*(x+counter));
-    }
-
 
   int iterCount;
 
     for (iterCount = 0; iterCount < iter; ++iterCount) {
-   double *calculatedValues;
   matVec(mat, x,calculatedValues, (size /nprocs),size);
 
-      gatherNewVec(calculatedValues, n, x);
 
-  broadcastVector(x, size);
+     MPI_Allgather(calculatedValues,2*size/nprocs,MPI_INT, x, 2*size/nprocs,MPI_INT,MPI_COMM_WORLD);
 
-/*  double sum;
-  sum = norm2(calculatedValues, n);
 
-  updateLambdaVec(lambda,x,sum,n);
 
-  broadcastVector(x, size);
-*/
+
+                    int counter;
+            for(counter = 0; counter < size;++counter) {
+                printf("FULL VEC:item %u : %f \n", counter, *(x+ counter));
+            }
+
+
+
+   broadcastVector(x, size);
+
+   double sum;
+   sum = norm2(calculatedValues, size);
+
+   updateLambdaVec(lambda,x,sum,size);
+
+   broadcastVector(x, size);
+
  }
 
   return 0.0;
@@ -109,17 +140,22 @@ void matVec(double *mat, double *vec, double *local_vec, int nrows, int size){
     int nprocs;
     int myrank = MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
-  local_vec = (double *) calloc(nrows, sizeof(double)); //num of processors out of scope????
 
   int rowCount, colCount;
     int rowsToParse = nrows;
     for(rowCount = 0; rowCount < rowsToParse; ++rowCount){
-      *(local_vec + rowCount) = 0;
+        *(local_vec + rowCount) = 0;
+        double sum = 0;
+
         for(colCount = 0; colCount < size; ++colCount) {
-        *(local_vec + rowCount) += *(mat+colCount) *  *(vec+colCount);
-            printf("PROC: %u LOCALVEC: %f \n",myrank, *(local_vec + rowCount));
+            printf("ROWCOUNT IS %u\n", rowCount);
+
+            *(local_vec + rowCount) += *(mat+((size * rowCount)+colCount)) *  *(vec+colCount);
+
+            sum += *(mat+colCount) *  *(vec+colCount);
 
         }
+        printf("PROC %u vector Num %u: %f should be %f \n", myrank,rowCount, *(local_vec + rowCount), sum);
 
     }
 }
@@ -135,14 +171,21 @@ printf("SIZE %d", sizeof(double));
 
 void gatherNewVec(double *vecValues, int n, double * vec){
   // Can optimize later
-  double * totalVec;
+  double *totalVec;
   int myrank,nprocs;
   int rowSplit = n/nprocs;
 
   MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
-  MPI_Gather(&vecValues, rowSplit, MPI_INT, &vec, n, MPI_INT, 0, MPI_COMM_WORLD);
+
+    if(myrank == 0){
+
+        MPI_Gather(&vecValues, n/nprocs, MPI_INT, &vec, n/nprocs, MPI_INT, 0, MPI_COMM_WORLD);
+
+
+    }
+    else MPI_Gather(&vecValues, n/nprocs, MPI_INT, NULL, n/nprocs, MPI_INT, 0, MPI_COMM_WORLD);
 
 }
 
