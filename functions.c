@@ -11,20 +11,18 @@
  */
 
 #include "powermethod.h"
-
 // Subroutine for generating the input matrix (just one thread's part)
 void generatematrix(double * mat, int size)
 {
   int myrank,nprocs;
-  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-  //use these to know what rows are getting
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+
+    //use these to know what rows are getting
   //To Do: make 1111
   //            2222
   //            3333
-
   int i;
-    int fullSize = size * size;
+    int fullSize = size * size/ nprocs;
   for (i = 0; i < fullSize; i++ ){
     *(mat + i) = floor(i / size) + 1.0; // every member of matrix is equal to row number
   }
@@ -39,19 +37,29 @@ void generatevec(double * x,int size)
   }
 }
 
-// Subroutine for the power method, to return the spectral radius
+// Subrou   tine for the power method, to return the spectral radius
 double powerMethod(double * mat, double * x, int size, int iter)
 {
   int n = size;
   double *lambda;
   broadcastVector(x, size);
   int iterCount;
+    int myrank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
- for (iterCount = 0; iterCount < iter; ++iterCount) {
+
+    for (iterCount = 0; iterCount < iter; ++iterCount) {
    double *calculatedValues;
   matVec(mat, x,calculatedValues, n,size);
   gatherNewVec(calculatedValues, n, x);
-  broadcastVector(x, size);
+
+        if(myrank == 0){
+            int showCount;
+            for(showCount = 0;showCount < size;++showCount)
+            printf("%f", *(x+showCount));
+        }
+
+ /* broadcastVector(x, size);
 
   double sum;
   sum = norm2(calculatedValues, n);
@@ -59,7 +67,7 @@ double powerMethod(double * mat, double * x, int size, int iter)
   updateLambdaVec(lambda,x,sum,n);
 
   broadcastVector(x, size);
-
+*/
  }
 
   return *lambda;
@@ -88,7 +96,6 @@ void matVec(double *mat, double *vec, double *local_vec, int nrows, int size){
 
   free(local_vec);
     local_vec = (double *) calloc(nrows /nprocs, sizeof(double)); //num of processors out of scope????
-  //returnMatrix = new [n/ PROC] double ;
   int rowCount, colCount;
     int rowsToParse = nrows/nprocs;
     for(rowCount = 0; rowCount < rowsToParse; ++rowCount){

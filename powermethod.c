@@ -44,8 +44,10 @@ int main(int argc, char **argv)
 
   }
 
+
   generatematrix(mat, size); // every thread generates its part of the matrix.
-  generatevec(vec, size);    // every thread generates all of the start vector.
+
+   generatevec(vec, size);    // every thread generates all of the start vector.
 
   // Power method to generate the spectral radius of the matrix.
   
