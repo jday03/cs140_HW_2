@@ -43,32 +43,32 @@ void generateVec(double * x,int size)
 double powerMethod(double * mat, double * x, int size, int iter)
 {
   int n = sqrt (size);
-  double lambda;
+  double *lambda;
   broadcastVector(x, size);
   int iterCount;
+
  for (iterCount = 0; iterCount < iter; ++iterCount) {
    double *calculatedValues;
-
-  calculatedValues = matVec(mat, x, n);
+  matVec(mat, x,calculatedValues, n,size);
   gatherNewVec(calculatedValues, n, x);
   broadcastVector(x, size);
 
   double sum;
   sum = norm2(calculatedValues, n);
 
-  updateLambdaVec(lambda,x,sum);
+  updateLambdaVec(lambda,x,sum,n);
 
   broadcastVector(x, size);
 
  }
 
-  return lambda;
+  return *lambda;
 }
 
 
 void updateLambdaVec(double * lambda, double* x,double sum, int n){
-
-    for(int count = 0; count < n; ++count){
+    int count;
+    for(count = 0; count < n; ++count){
         *(lambda+count) = *(x+count)/sum;
         *(x+count) = *(lambda+ count);
     }
@@ -81,51 +81,30 @@ void updateLambdaVec(double * lambda, double* x,double sum, int n){
 
 
 
-
-double*  matVec(double *mat, double *x, int n){
+void matVec(double *mat, double *vec, double *local_vec, int nrows, int size){
 
     int nprocs;
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
-  double *returnMatrix;
-  returnMatrix = (double *) calloc(n /nprocs, sizeof(double)); //num of processors out of scope????
+  free(local_vec);
+    local_vec = (double *) calloc(nrows /nprocs, sizeof(double)); //num of processors out of scope????
   //returnMatrix = new [n/ PROC] double ;
-  int rowcount, colCount;
-    for(rowCount = 0; rowCount < n; ++rowCount){
-      *(returnMatrix + rowCount) = 0;
-      for(colCount = 0; colCount < n; ++colCount) {
-        *(returnMatrix + rowCount) += *(mat+colCount) *  *(x+colCount);
+  int rowCount, colCount;
+    int rowsToParse = nrows/nprocs;
+    for(rowCount = 0; rowCount < rowsToParse; ++rowCount){
+      *(local_vec + rowCount) = 0;
+      for(colCount = 0; colCount < nrows; ++colCount) {
+        *(local_vec + rowCount) += *(mat+colCount) *  *(vec+colCount);
       }
 
     }
-
-  return returnMatrix;
 }
-
-
-
-
-
-
-double squareVector(double * x, int n){
-  double returnValues;
-  returnValues = 0;
-
-  for(int count = 0;count < n; count++){
-    returnValues[count] += *(x+count) *(x+count);
-  }
-
-  return returnValues;
-}
-
-
-
 
 
 void broadcastVector(double * vector,int size){
 
   // Can include better implementation later.
-  MPI_Bcast(&vector, &size, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&vector, size, MPI_INT, 0, MPI_COMM_WORLD);
 
 
 }
@@ -139,7 +118,7 @@ void gatherNewVec(double *vecValues, int n, double * vec){
   MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
-  MPI_Gather(&vecValues, &rowSplit, MPI_INT, &vec, &n, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Gather(&vecValues, rowSplit, MPI_INT, &vec, n, MPI_INT, 0, MPI_COMM_WORLD);
 
 }
 
@@ -163,8 +142,8 @@ double norm2(double *x, int size){
 
     int finishPoint = (myrank + 1) * (n/nprocs);
     double partialSum = 0.0;
-
-    for(int i = myrank * (n/nprocs); i < finishPoint; ++i){
+    int i;
+    for(i = myrank * (n/nprocs); i < finishPoint; ++i){
         double tempSquare = *(x + i);
         partialSum = partialSum + pow(tempSquare, 2);
     }
