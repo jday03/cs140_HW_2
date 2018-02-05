@@ -25,41 +25,55 @@ void generatematrix(double * mat, int size)
     int fullSize = size * size/ nprocs;
   for (i = 0; i < fullSize; i++ ){
     *(mat + i) = floor(i / size) + 1.0; // every member of matrix is equal to row number
+      printf("MAT %f\n", *(mat + i));
+
   }
 }
 
 // Subroutine to generate a start vector
 void generatevec(double * x,int size)
 {
-  int i;
-  for (i = 0; i < size; i++ ){
-    *(x + i) = 1; // vector of 1s
-  }
+    int myrank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+    if(myrank == 0) {
+        int i = 0;
+        double *iter;
+        for (iter = x; i < size; iter++) {
+            x[i] = 1.0;
+            printf("VEC %f\n", x[i]);
+            i++;
+        }
+    }
 }
 
-// Subrou   tine for the power method, to return the spectral radius
+// Subroutine for the power method, to return the spectral radius
 double powerMethod(double * mat, double * x, int size, int iter)
 {
-  int n = size;
-  double *lambda;
-  broadcastVector(x, size);
-  int iterCount;
+
+    double *lambda;
+
     int myrank;
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
 
+    int n = size;
+  broadcastVector(x, size);
+    int counter;
+    for(counter = 0; counter < size; ++counter){
+        printf("rank is %d, value of %u is %f \n",myrank,counter,*(x+counter));
+    }
+
+/*
+  int iterCount;
+
     for (iterCount = 0; iterCount < iter; ++iterCount) {
    double *calculatedValues;
   matVec(mat, x,calculatedValues, n,size);
-  gatherNewVec(calculatedValues, n, x);
 
-        if(myrank == 0){
-            int showCount;
-            for(showCount = 0;showCount < size;++showCount)
-            printf("%f", *(x+showCount));
-        }
+      gatherNewVec(calculatedValues, n, x);
 
- /* broadcastVector(x, size);
+  broadcastVector(x, size);
 
   double sum;
   sum = norm2(calculatedValues, n);
@@ -67,10 +81,10 @@ double powerMethod(double * mat, double * x, int size, int iter)
   updateLambdaVec(lambda,x,sum,n);
 
   broadcastVector(x, size);
-*/
- }
 
-  return *lambda;
+ }
+*/
+  return 0.0;
 }
 
 
@@ -95,7 +109,9 @@ void matVec(double *mat, double *vec, double *local_vec, int nrows, int size){
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
   free(local_vec);
+
     local_vec = (double *) calloc(nrows /nprocs, sizeof(double)); //num of processors out of scope????
+
   int rowCount, colCount;
     int rowsToParse = nrows/nprocs;
     for(rowCount = 0; rowCount < rowsToParse; ++rowCount){
