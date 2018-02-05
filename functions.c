@@ -24,14 +24,14 @@ void generatematrix(double * mat, int size)
   //            3333
 
   int i;
-    int n = sqrt(size);
-  for (i = 0; i < size; i++ ){
-    *(mat + i) = floor(i / n) + 1.0; // every member of matrix is equal to row number
+    int fullSize = size * size;
+  for (i = 0; i < fullSize; i++ ){
+    *(mat + i) = floor(i / size) + 1.0; // every member of matrix is equal to row number
   }
 }
 
 // Subroutine to generate a start vector
-void generateVec(double * x,int size)
+void generatevec(double * x,int size)
 {
   int i;
   for (i = 0; i < size; i++ ){
@@ -42,7 +42,7 @@ void generateVec(double * x,int size)
 // Subroutine for the power method, to return the spectral radius
 double powerMethod(double * mat, double * x, int size, int iter)
 {
-  int n = sqrt (size);
+  int n = size;
   double *lambda;
   broadcastVector(x, size);
   int iterCount;
@@ -136,7 +136,7 @@ void receiveSquares(double * square, double *sum){   //maybe need to change retu
 double norm2(double *x, int size){
 
     int myrank,nprocs;
-
+    int n = size;
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
