@@ -46,7 +46,7 @@ void generatematrix(double * mat, int size)
 
   //  printf("myrank = %d\n", myrank);
     for(i = 0; i < size *amountOfColumns; i++){
-        printf("mat[%d] : %f\n", i, mat[i]);
+       // printf("mat[%d] : %f\n", i, mat[i]);
 
     }
 
@@ -78,7 +78,7 @@ double powerMethod(double * mat, double * x, int size, int iter)
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
-    double *lambda;
+    double *lambda = (double *) calloc(1, sizeof(double));
     double *calculatedValues= (double *) calloc(size/nprocs, sizeof(double));
 
 
@@ -100,31 +100,37 @@ double powerMethod(double * mat, double * x, int size, int iter)
 
                     int counter;
             for(counter = 0; counter < size;++counter) {
-                printf("FULL VEC:item %u : %f \n", counter, *(x+ counter));
+               // printf("FULL VEC:item %u : %f \n", counter, *(x+ counter));
             }
 
+       // printf("PROCSUMMMMM333 %u vector Num 7: %f \n", myrank, (*(x + 7)));
 
 
    broadcastVector(x, size);
 
    double sum;
-   sum = norm2(calculatedValues, size);
+   sum = norm2(x, size);
 
-   updateLambdaVec(lambda,x,sum,size);
+        if(myrank == 0){
+        //printf("SUMMATION AT END: %f",sum);
+        sum = sqrt(sum);
+            updateLambdaVec(lambda,x,sum,size);
+            *lambda = sum;
+        }
+
 
    broadcastVector(x, size);
 
  }
 
-  return 0.0;
+  return *lambda;
 }
 
 
 void updateLambdaVec(double * lambda, double* x,double sum, int n){
     int count;
     for(count = 0; count < n; ++count){
-        *(lambda+count) = *(x+count)/sum;
-        *(x+count) = *(lambda+ count);
+        *(x+count) = *(x+count)/sum;
     }
 }
 
@@ -148,21 +154,21 @@ void matVec(double *mat, double *vec, double *local_vec, int nrows, int size){
         double sum = 0;
 
         for(colCount = 0; colCount < size; ++colCount) {
-            printf("ROWCOUNT IS %u\n", rowCount);
+          //  printf("ROWCOUNT IS %u\n", rowCount);
 
             *(local_vec + rowCount) += *(mat+((size * rowCount)+colCount)) *  *(vec+colCount);
 
             sum += *(mat+colCount) *  *(vec+colCount);
 
         }
-        printf("PROC %u vector Num %u: %f should be %f \n", myrank,rowCount, *(local_vec + rowCount), sum);
+       // printf("PROC %u vector Num %u: %f should be %f \n", myrank,rowCount, *(local_vec + rowCount), sum);
 
     }
 }
 
 
 void broadcastVector(double * vector,int size){
-printf("SIZE %d", sizeof(double));
+//printf("SIZE %d", sizeof(double));
   // Can include better implementation later.
   MPI_Bcast(vector, 2* size, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -200,24 +206,27 @@ void receiveSquares(double * square, double *sum){   //maybe need to change retu
 }
 
 
-double norm2(double *x, int size){
+double norm2(double* x, int size){
+
 
     int myrank,nprocs;
-    int n = size;
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
-    int finishPoint = (myrank + 1) * (n/nprocs);
+
+    int finishPoint = (myrank + 1) * (size/nprocs);
     double partialSum = 0.0;
     int i;
-    for(i = myrank * (n/nprocs); i < finishPoint; ++i){
+    for(i = myrank * (size/nprocs); i < finishPoint; ++i){
         double tempSquare = *(x + i);
         partialSum = partialSum + pow(tempSquare, 2);
+
     }
+   // printf("PROCSUMMMMM %u vector partialSum = %f \n", myrank, partialSum);
 
-    double sum = 0.0;
+    double sum =0.0;
     MPI_Reduce(&partialSum, &sum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-
+    //printf("SUM after reduce: %u vector Sum = %f \n", myrank, sum);
 
     return sum;
 }
