@@ -53,8 +53,9 @@ double powerMethod(double * mat, double * x, int size, int iter)
 
     double *lambda;
 
-    int myrank;
+    int myrank,nprocs;
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
 
     int n = size;
@@ -64,26 +65,26 @@ double powerMethod(double * mat, double * x, int size, int iter)
         printf("rank is %d, value of %u is %f \n",myrank,counter,*(x+counter));
     }
 
-/*
+
   int iterCount;
 
     for (iterCount = 0; iterCount < iter; ++iterCount) {
    double *calculatedValues;
-  matVec(mat, x,calculatedValues, n,size);
+  matVec(mat, x,calculatedValues, (size /nprocs),size);
 
       gatherNewVec(calculatedValues, n, x);
 
   broadcastVector(x, size);
 
-  double sum;
+/*  double sum;
   sum = norm2(calculatedValues, n);
 
   updateLambdaVec(lambda,x,sum,n);
 
   broadcastVector(x, size);
-
- }
 */
+ }
+
   return 0.0;
 }
 
@@ -106,28 +107,28 @@ void updateLambdaVec(double * lambda, double* x,double sum, int n){
 void matVec(double *mat, double *vec, double *local_vec, int nrows, int size){
 
     int nprocs;
-    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+    int myrank = MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
-  free(local_vec);
-
-    local_vec = (double *) calloc(nrows /nprocs, sizeof(double)); //num of processors out of scope????
+  local_vec = (double *) calloc(nrows, sizeof(double)); //num of processors out of scope????
 
   int rowCount, colCount;
-    int rowsToParse = nrows/nprocs;
+    int rowsToParse = nrows;
     for(rowCount = 0; rowCount < rowsToParse; ++rowCount){
       *(local_vec + rowCount) = 0;
-      for(colCount = 0; colCount < nrows; ++colCount) {
+        for(colCount = 0; colCount < size; ++colCount) {
         *(local_vec + rowCount) += *(mat+colCount) *  *(vec+colCount);
-      }
+            printf("PROC: %u LOCALVEC: %f \n",myrank, *(local_vec + rowCount));
+
+        }
 
     }
 }
 
 
 void broadcastVector(double * vector,int size){
-
+printf("SIZE %d", sizeof(double));
   // Can include better implementation later.
-  MPI_Bcast(&vector, size, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(vector, 2* size, MPI_INT, 0, MPI_COMM_WORLD);
 
 
 }
